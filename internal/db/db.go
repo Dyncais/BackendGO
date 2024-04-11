@@ -5,6 +5,7 @@ import (
 	"SomeProject/internal/models"
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -64,37 +65,39 @@ func ConnectDB(cfg *Config) (*DBPool, error) {
 	return &DBPool{Pool: dbPool}, nil
 }
 
-func LoadBannerByParams(dbPool *pgxpool.Pool, tagID, featureID string, useLastRevision bool) (models.Banner, error) {
+func LoadBannerByParams(dbPool *pgxpool.Pool, tagID, featureID string, useLastRevision bool) (*models.Banner, error) {
+	log.Println("LoadBannerByParams called")
 	var banner models.Banner
 
 	query := `
-    SELECT Title, Text, URL
-    FROM banners 
-    WHERE tag_id=$1 AND feature_id=$2 
-    ORDER BY created_at DESC`
-
-	var err error
-	if useLastRevision {
-		query += " LIMIT 1"
-		err = dbPool.QueryRow(context.Background(), query, tagID, featureID).Scan(&banner.Title, &banner.Text, &banner.URL)
-	} else {
-		err = dbPool.QueryRow(context.Background(), query, tagID, featureID).Scan(&banner.Title, &banner.Text, &banner.URL)
-	}
-
+        SELECT b.title, b.text, b.url
+        FROM banners b
+        WHERE $1 = ANY(b.TagIDs) AND b.FeatureID = $2
+        ORDER BY b.id DESC
+        LIMIT 1;
+    `
+	err := dbPool.QueryRow(context.Background(), query, tagID, featureID).Scan(&banner.Title, &banner.Text, &banner.URL)
 	if err != nil {
-		return models.Banner{}, fmt.Errorf("failed to load banner: %v", err)
+		return nil, err
 	}
-
-	return banner, nil
+	return &banner, nil
 }
 
-func InsertBanner(dbPool *pgxpool.Pool, banner models.Banner) (int, error) {
+func InsertBanner(dbPool *pgxpool.Pool, bannerRequest models.BannerCreationRequest) (int, error) {
 	var bannerID int
-	query := `INSERT INTO banners1 (Title, Text, URL, TagIDs, FeatureID, IsActive) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
-	err := dbPool.QueryRow(context.Background(), query, banner.Title, banner.Text, banner.URL, banner.TagIDs, banner.FeatureID, banner.IsActive).Scan(&bannerID)
+	query := `INSERT INTO banners (Title, Text, URL, TagIDs, FeatureID, IsActive) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
+	err := dbPool.QueryRow(context.Background(), query,
+		bannerRequest.Content.Title,
+		bannerRequest.Content.Text,
+		bannerRequest.Content.URL,
+		bannerRequest.TagIDs,
+		bannerRequest.FeatureID,
+		bannerRequest.IsActive,
+	).Scan(&bannerID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert banner: %v", err)
 	}
+	log.Printf("Баннер успешно добавлен с ID %d", bannerID)
 	return bannerID, nil
 }
 
@@ -132,7 +135,7 @@ func UpdateBanner(dbPool *pgxpool.Pool, bannerID int, update models.BannerUpdate
 		return fmt.Errorf("no fields specified for update")
 	}
 
-	query := fmt.Sprintf("UPDATE banners1 SET %s WHERE id = $1", strings.Join(setClauses, ", "))
+	query := fmt.Sprintf("UPDATE banners SET %s WHERE id = $1", strings.Join(setClauses, ", "))
 	cmdTag, err := dbPool.Exec(context.Background(), query, args...)
 	if err != nil {
 		return fmt.Errorf("failed to update banner: %w", err)

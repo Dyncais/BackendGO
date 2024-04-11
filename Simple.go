@@ -1,15 +1,77 @@
 package main
 
 import (
+	"SomeProject/internal/Test"
 	"SomeProject/internal/cache"
 	"SomeProject/internal/db"
 	"SomeProject/internal/handlers"
-	"SomeProject/internal/models"
-	"context"
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
 )
+
+/*func createTables(dbPool *pgxpool.Pool) error {
+
+	_, err := dbPool.Exec(context.Background(), `
+        CREATE TABLE IF NOT EXISTS tags (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(255) NOT NULL
+        );`)
+	if err != nil {
+		return err
+	}
+
+	_, err = dbPool.Exec(context.Background(), `
+        CREATE TABLE IF NOT EXISTS features (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(255) NOT NULL
+        );`)
+	if err != nil {
+		return err
+	}
+
+	_, err = dbPool.Exec(context.Background(), `
+        CREATE TABLE IF NOT EXISTS banner_tags (
+    	banner_id INTEGER NOT NULL,
+    	tag_id INTEGER NOT NULL,
+    	CONSTRAINT fk_banner FOREIGN KEY (banner_id) REFERENCES banners(id) ON DELETE CASCADE,
+    	CONSTRAINT fk_tag FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE,
+    	PRIMARY KEY (banner_id, tag_id));
+	`)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func insertTestData(dbPool *pgxpool.Pool) error {
+
+	_, err := dbPool.Exec(context.Background(), `
+        INSERT INTO tags (name) VALUES ('Тег 1'), ('Тег 2'), ('Тег 3')
+        ON CONFLICT DO NOTHING;`)
+	if err != nil {
+		return err
+	}
+
+	_, err = dbPool.Exec(context.Background(), `
+        INSERT INTO features (name) VALUES ('Фича 1'), ('Фича 2'), ('Фича 3')
+        ON CONFLICT DO NOTHING;`)
+	if err != nil {
+		return err
+	}
+
+	_, err = dbPool.Exec(context.Background(), `
+        INSERT INTO banner_tags (banner_id, tag_id) VALUES
+		(1, 1),
+		(1, 2);`)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+*/
 
 func main() {
 
@@ -25,58 +87,52 @@ func main() {
 	}
 	defer dbPool.Pool.Close()
 
+	/*if err := createTables(dbPool.Pool); err != nil {
+		log.Fatalf("Failed to create tables: %v", err)
+	}
+
+	if err := insertTestData(dbPool.Pool); err != nil {
+		log.Fatalf("Failed to insert test data: %v", err)
+	}
+
 	createTableQuery := `
-    CREATE TABLE IF NOT EXISTS banners1 (
-        id SERIAL PRIMARY KEY,
-        Title VARCHAR(255) NOT NULL,
-        Text TEXT,
-        URL VARCHAR(255),
-        TagIDs INTEGER[],
-        FeatureID INT,
-        IsActive BOOLEAN NOT NULL DEFAULT TRUE
-    );`
+	    CREATE TABLE IF NOT EXISTS banners1 (
+	        id SERIAL PRIMARY KEY,
+	        Title VARCHAR(255) NOT NULL,
+	        Text TEXT,
+	        URL VARCHAR(255),
+	        TagIDs INTEGER[],
+	        FeatureID INT,
+	        IsActive BOOLEAN NOT NULL DEFAULT TRUE
+	    );`
 
-	_, err = dbPool.Pool.Exec(context.Background(), createTableQuery)
-	if err != nil {
-		log.Fatalf("Ошибка при создании таблицы banners: %v", err)
+		_, err = dbPool.Pool.Exec(context.Background(), createTableQuery)
+		if err != nil {
+			log.Fatalf("Ошибка при создании таблицы banners: %v", err)
+		}*/
+
+	if err := Test.DropTables(dbPool.Pool); err != nil {
+		log.Fatalf("Failed to drop tables: %v", err)
 	}
 
-	newBanner := models.Banner{
-		Title:     "Новый баннер",
-		Text:      "Описание нового баннера",
-		URL:       "https://example.com",
-		TagIDs:    []int{1, 2, 3},
-		FeatureID: 1,
-		IsActive:  true,
+	// Вызов функции для создания таблиц
+	if err := Test.CreateTables(dbPool.Pool); err != nil {
+		log.Fatalf("Failed to create tables: %v", err)
 	}
 
-	bannerID, err := db.InsertBanner(dbPool.Pool, newBanner)
-	if err != nil {
-		log.Fatalf("Ошибка при вставке баннера: %v", err)
+	// Вызов функции для вставки тестовых данных
+	if err := Test.InsertTestData(dbPool.Pool); err != nil {
+		log.Fatalf("Failed to insert test data: %v", err)
 	}
-
-	log.Printf("Баннер успешно добавлен с ID %d", bannerID)
 
 	bannerCache := cache.NewBannerCache()
 
 	router := mux.NewRouter()
 
-	router.HandleFunc("/user_banner", func(w http.ResponseWriter, r *http.Request) {
-		handlers.GetUserBanner(bannerCache, dbPool, w, r)
-	}).Methods("GET")
+	router.HandleFunc("/user_banner", handlers.GetUserBanner(bannerCache, dbPool)).Methods("GET")
 
-	//изменить логику
-	http.HandleFunc("/banners", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet && r.Method != http.MethodPost {
-			http.Error(w, "Only GET method is allowed", http.StatusMethodNotAllowed)
-			return
-		}
-		if r.Method == http.MethodGet {
-			//handlers.GetBanner(w, r)
-		} else {
-			//handlers.GetBanner(w, r)
-		}
-	})
+	//router.HandleFunc("/banner", handlers.GetBanner(dbPool)).Methods("GET")
+	router.HandleFunc("/banner", handlers.NewBanner(dbPool)).Methods("POST")
 
 	router.HandleFunc("/banner/{id}", handlers.PatchBanner(dbPool)).Methods("PATCH")
 	router.HandleFunc("/banner/{id}", handlers.DeleteBanner(dbPool)).Methods("DELETE")

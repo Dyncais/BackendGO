@@ -1,5 +1,31 @@
 package handlers
 
+import (
+	"SomeProject/internal/db"
+	"SomeProject/internal/models"
+	"encoding/json"
+	"net/http"
+)
+
+func NewBanner(dbPool *db.DBPool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var bannerData models.BannerCreationRequest
+		if err := json.NewDecoder(r.Body).Decode(&bannerData); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		bannerID, err := db.InsertBanner(dbPool.Pool, bannerData)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]int{"banner_id": bannerID})
+	}
+}
+
 /*func GetFilteredBanner(bannerCache *cache.BannerCache, dbPool *db.DBPool, w http.ResponseWriter, r *http.Request) {
 	log.Println("GetFilteredBanner called")
 	token := r.Header.Get("token")
