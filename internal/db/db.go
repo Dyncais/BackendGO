@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strconv"
 
 	"github.com/jackc/pgx/v4"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -76,11 +77,62 @@ func LoadBannerByParams(dbPool *pgxpool.Pool, tagID, featureID string, useLastRe
         ORDER BY b.id DESC
         LIMIT 1;
     `
-	err := dbPool.QueryRow(context.Background(), query, tagID, featureID).Scan(&banner.Title, &banner.Text, &banner.URL)
+	err := dbPool.QueryRow(context.Background(), query, tagID, featureID).Scan(&banner.Content.Title, &banner.Content.Text, &banner.Content.URL)
 	if err != nil {
 		return nil, err
 	}
 	return &banner, nil
+}
+
+func LoadBannersByParams(dbPool *pgxpool.Pool, tagID, featureID, limit, offset string) ([]models.Banner, error) {
+	var banners []models.Banner
+
+	var tagIDInt, featureIDInt *int
+	if tagID != "" {
+		parsed, err := strconv.Atoi(tagID)
+		if err == nil {
+			tagIDInt = &parsed
+		}
+	}
+	if featureID != "" {
+		parsed, err := strconv.Atoi(featureID)
+		if err == nil {
+			featureIDInt = &parsed
+		}
+	}
+
+	limitInt, err := strconv.Atoi(limit)
+	if err != nil || limitInt <= 0 {
+		limitInt = 10
+	}
+
+	offsetInt, err := strconv.Atoi(offset)
+	if err != nil || offsetInt < 0 {
+		offsetInt = 0
+	}
+
+	query := `
+        SELECT ID, TagIDs, FeatureID, title, text, url, IsActive
+        FROM banners
+        WHERE ($1::int IS NULL OR $1 = ANY(TagIDs)) AND ($2::int IS NULL OR FeatureID = $2)
+        LIMIT $3 OFFSET $4
+    `
+	rows, err := dbPool.Query(context.Background(), query, tagIDInt, featureIDInt, limitInt, offsetInt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var banner models.Banner
+		err := rows.Scan(&banner.ID, &banner.TagIDs, &banner.FeatureID, &banner.Content.Title, &banner.Content.Text, &banner.Content.URL, &banner.IsActive)
+		if err != nil {
+			return nil, err
+		}
+		banners = append(banners, banner)
+	}
+
+	return banners, nil
 }
 
 func InsertBanner(dbPool *pgxpool.Pool, bannerRequest models.BannerCreationRequest) (int, error) {

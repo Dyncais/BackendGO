@@ -15,7 +15,7 @@ func GetUserBanner(bannerCache *cache.BannerCache, dbPool *db.DBPool) http.Handl
 		log.Println("GetUserBanner called")
 		tagID := r.URL.Query().Get("tag_id")
 		featureID := r.URL.Query().Get("feature_id")
-		useLastRevision := r.URL.Query().Get("use_last_revision") == "true" // Предполагается, что "true" по умолчанию
+		useLastRevision := r.URL.Query().Get("use_last_revision") == "false"
 		token := r.Header.Get("token")
 
 		if token == "" {
@@ -48,6 +48,11 @@ func GetUserBanner(bannerCache *cache.BannerCache, dbPool *db.DBPool) http.Handl
 }
 
 func respondWithJSON(w http.ResponseWriter, data interface{}) {
+	response, err := json.Marshal(data)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(data)
+	w.Write(response)
 }

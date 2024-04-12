@@ -2,9 +2,25 @@
 package models
 
 type Banner struct {
-	Title string `json:"title"`
-	Text  string `json:"text"`
-	URL   string `json:"url"`
+	ID        int32 `json:id`
+	TagIDs    []int `json:"tag_ids"`
+	FeatureID int   `json:"feature_id"`
+	Content   struct {
+		Title string `json:"title"`
+		Text  string `json:"text"`
+		URL   string `json:"url"`
+	} `json:"content"`
+	IsActive bool `json:"is_Active"`
+}
+
+type BannerWithID struct {
+	ID        int32  `json:id`
+	Title     string `json:"title"`
+	Text      string `json:"text"`
+	URL       string `json:"url"`
+	IsActive  bool   `json:"is_Active"`
+	CreatedAt string `json:"created_At"`
+	UpdatedAt string `json:"updated_At"`
 }
 
 type BannerUpdate struct {
