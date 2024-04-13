@@ -19,21 +19,34 @@ type BannerUpdateRequest struct {
 
 func PatchBanner(dbPool *db.DBPool) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+
+		token := r.Header.Get("token")
+
+		if token == "" {
+			http.Error(w, models.ErrUnauthorized, http.StatusUnauthorized)
+			return
+		}
+
+		if token != "admin_token" {
+			http.Error(w, models.ErrNoAccess, http.StatusForbidden)
+			return
+		}
+
 		vars := mux.Vars(r)
 		id, err := strconv.Atoi(vars["id"])
 		if err != nil {
-			http.Error(w, "Invalid banner ID", http.StatusBadRequest)
+			http.Error(w, models.ErrFailedLoadBanner, http.StatusNotFound)
 			return
 		}
 
 		var updateData models.BannerUpdate
 		if err := json.NewDecoder(r.Body).Decode(&updateData); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			http.Error(w, models.ErrWrongData, http.StatusBadRequest)
 			return
 		}
 
 		if err := db.UpdateBanner(dbPool.Pool, id, updateData); err != nil {
-			http.Error(w, "Failed to update banner", http.StatusInternalServerError)
+			http.Error(w, models.ErrInternalServerError, http.StatusInternalServerError)
 			return
 		}
 
@@ -44,29 +57,34 @@ func PatchBanner(dbPool *db.DBPool) func(w http.ResponseWriter, r *http.Request)
 func DeleteBanner(dbPool *db.DBPool) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 
-		log.Println("DeleteBanner called")
-		vars := mux.Vars(r)
-		idStr := vars["id"]
 		token := r.Header.Get("token")
 
 		if token == "" {
-			http.Error(w, "Unauthorized: Token is required", http.StatusUnauthorized)
+			http.Error(w, models.ErrUnauthorized, http.StatusUnauthorized)
 			return
 		}
 
+		if token != "admin_token" {
+			http.Error(w, models.ErrNoAccess, http.StatusForbidden)
+			return
+		}
+
+		log.Println("DeleteBanner called")
+		vars := mux.Vars(r)
+		idStr := vars["id"]
+
 		id, err := strconv.Atoi(idStr)
 		if err != nil {
-			http.Error(w, "Invalid banner ID", http.StatusBadRequest)
+			http.Error(w, models.ErrWrongData, http.StatusNotFound)
 			panic(err)
 		}
 
 		err = db.DeleteBanner(dbPool.Pool, id)
 		if err != nil {
-			log.Printf("Failed to delete banner with ID %d: %v", id, err)
 			if err.Error() == "no banner found with ID "+strconv.Itoa(id) {
-				http.Error(w, "Banner not found", http.StatusNotFound)
+				http.Error(w, models.ErrFailedLoadBanner, http.StatusNotFound)
 			} else {
-				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				http.Error(w, models.ErrInternalServerError, http.StatusInternalServerError)
 			}
 			return
 		}

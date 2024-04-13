@@ -112,7 +112,7 @@ func LoadBannersByParams(dbPool *pgxpool.Pool, tagID, featureID, limit, offset s
 	}
 
 	query := `
-        SELECT ID, TagIDs, FeatureID, title, text, url, IsActive
+        SELECT ID, TagIDs, FeatureID, Title, Text, URL, IsActive, created_at, updated_at
         FROM banners
         WHERE ($1::int IS NULL OR $1 = ANY(TagIDs)) AND ($2::int IS NULL OR FeatureID = $2)
         LIMIT $3 OFFSET $4
@@ -125,7 +125,7 @@ func LoadBannersByParams(dbPool *pgxpool.Pool, tagID, featureID, limit, offset s
 
 	for rows.Next() {
 		var banner models.Banner
-		err := rows.Scan(&banner.ID, &banner.TagIDs, &banner.FeatureID, &banner.Content.Title, &banner.Content.Text, &banner.Content.URL, &banner.IsActive)
+		err := rows.Scan(&banner.ID, &banner.TagIDs, &banner.FeatureID, &banner.Content.Title, &banner.Content.Text, &banner.Content.URL, &banner.IsActive, &banner.CreatedAt, &banner.UpdatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -147,7 +147,7 @@ func InsertBanner(dbPool *pgxpool.Pool, bannerRequest models.BannerCreationReque
 		bannerRequest.IsActive,
 	).Scan(&bannerID)
 	if err != nil {
-		return 0, fmt.Errorf("failed to insert banner: %v", err)
+		return 0, fmt.Errorf("Некорректные данные: %v", err)
 	}
 	log.Printf("Баннер успешно добавлен с ID %d", bannerID)
 	return bannerID, nil

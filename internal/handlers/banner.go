@@ -17,7 +17,12 @@ func GetBanner(dbPool *db.DBPool) http.HandlerFunc {
 		token := r.Header.Get("token")
 
 		if token == "" {
-			http.Error(w, "Unauthorized: Token is required", http.StatusUnauthorized)
+			http.Error(w, models.ErrUnauthorized, http.StatusUnauthorized)
+			return
+		}
+
+		if token != "admin_token" {
+			http.Error(w, models.ErrNoAccess, http.StatusForbidden)
 			return
 		}
 
@@ -30,7 +35,7 @@ func GetBanner(dbPool *db.DBPool) http.HandlerFunc {
 
 		banner, err := db.LoadBannersByParams(dbPool.Pool, tagID, featureID, limit, offset)
 		if err != nil {
-			http.Error(w, "Failed to load banner: "+err.Error(), http.StatusInternalServerError)
+			http.Error(w, models.ErrInternalServerError, http.StatusInternalServerError)
 			return
 		}
 
@@ -42,15 +47,28 @@ func GetBanner(dbPool *db.DBPool) http.HandlerFunc {
 
 func NewBanner(dbPool *db.DBPool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+
+		token := r.Header.Get("token")
+
+		if token == "" {
+			http.Error(w, models.ErrUnauthorized, http.StatusUnauthorized)
+			return
+		}
+
+		if token != "admin_token" {
+			http.Error(w, models.ErrNoAccess, http.StatusForbidden)
+			return
+		}
+
 		var bannerData models.BannerCreationRequest
 		if err := json.NewDecoder(r.Body).Decode(&bannerData); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			http.Error(w, models.ErrWrongData, http.StatusBadRequest)
 			return
 		}
 
 		bannerID, err := db.InsertBanner(dbPool.Pool, bannerData)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, models.ErrInternalServerError, http.StatusInternalServerError)
 			return
 		}
 

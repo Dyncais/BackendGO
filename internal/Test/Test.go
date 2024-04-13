@@ -39,20 +39,48 @@ func CreateTables(dbPool *pgxpool.Pool) error {
 		return err
 	}
 
+	createFunction := `
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+`
+
+	_, err = dbPool.Exec(context.Background(), createFunction)
+	if err != nil {
+		log.Fatalf("Ошибка при создании функции для обновления: %v", err)
+	}
+
 	createTableQuery := `
-    CREATE TABLE IF NOT EXISTS banners (
-        id SERIAL PRIMARY KEY,
-        Title VARCHAR(255) NOT NULL,
-        Text TEXT,
-        URL VARCHAR(255),
-        TagIDs INTEGER[],
-        FeatureID INT,
-        IsActive BOOLEAN NOT NULL DEFAULT TRUE
-    );`
+CREATE TABLE IF NOT EXISTS banners (
+    id SERIAL PRIMARY KEY,
+    Title VARCHAR(255) NOT NULL,
+    Text TEXT,
+    URL VARCHAR(255),
+    TagIDs INTEGER[],
+    FeatureID INT,
+    IsActive BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+`
 
 	_, err = dbPool.Exec(context.Background(), createTableQuery)
 	if err != nil {
 		log.Fatalf("Ошибка при создании таблицы banners: %v", err)
+	}
+
+	createTrigger := `
+CREATE TRIGGER update_banners_updated_at BEFORE UPDATE ON banners
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+`
+
+	_, err = dbPool.Exec(context.Background(), createTrigger)
+	if err != nil {
+		log.Fatalf("Ошибка при создании триггера: %v", err)
 	}
 
 	_, err = dbPool.Exec(context.Background(), `
