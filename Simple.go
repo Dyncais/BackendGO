@@ -43,6 +43,9 @@ func main() {
 	router.HandleFunc("/banner/{id}", handlers.PatchBanner(dbPool)).Methods("PATCH")
 	router.HandleFunc("/banner/{id}", handlers.DeleteBanner(dbPool)).Methods("DELETE")
 
+	if enableTesting {
+		router.HandleFunc("/test", Test.TestAPIHandle()).Methods("GET")
+	}
 	log.Println("Сервер запущен на порту 8080")
 	if err := http.ListenAndServe(":8080", router); err != nil {
 		log.Fatalf("Ошибка при запуске сервера: %v", err)

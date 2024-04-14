@@ -36,14 +36,22 @@ func GetUserBanner(bannerCache *cache.BannerCache, dbPool *db.DBPool) http.Handl
 		}
 
 		banner, err := db.LoadBannerByParams(dbPool.Pool, tagID, featureID, useLastRevision)
+
 		if err != nil {
+			if err.Error() == "BannerOff" && token != "admin_token" {
+				http.Error(w, models.ErrNoAccess, http.StatusForbidden)
+				return
+			} else {
+				respondWithJSON(w, banner.Content)
+				return
+			}
 			http.Error(w, models.ErrInternalServerError, http.StatusInternalServerError)
 			return
 		}
 
 		//bannerCache.Set(cacheKey, banner)
 
-		respondWithJSON(w, banner)
+		respondWithJSON(w, banner.Content)
 	}
 }
 

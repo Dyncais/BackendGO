@@ -2,8 +2,14 @@ package Test
 
 import (
 	"context"
+	"fmt"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"log"
+	"math/rand"
+	"net/http"
+	"sync"
+	"sync/atomic"
+	"time"
 )
 
 func DropTables(dbPool *pgxpool.Pool) error {
@@ -133,4 +139,66 @@ func InsertTestData(dbPool *pgxpool.Pool) error {
 	}
 	log.Printf("Вставил")
 	return nil
+}
+
+func TestAPIPerformance() (int64, float64, float64, int64) {
+	client := &http.Client{
+		Transport: &http.Transport{
+			MaxIdleConns:        100,
+			IdleConnTimeout:     90 * time.Second,
+			MaxIdleConnsPerHost: 100,
+		},
+	}
+	var count atomic.Int64
+	var errorCount atomic.Int64
+	var wg sync.WaitGroup
+
+	duration := 5 * time.Second
+	startTime := time.Now()
+	endTime := startTime.Add(duration)
+
+	for time.Now().Before(endTime) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			tagID := rand.Intn(1000)
+			featureID := rand.Intn(1000)
+
+			url := fmt.Sprintf("http://localhost:8080/user_banner?tag_id=%d&feature_id=%d", tagID, featureID)
+			request, err := http.NewRequest("GET", url, nil)
+			if err != nil {
+				fmt.Printf("Error creating request: %v\n", err)
+				errorCount.Add(1)
+				return
+			}
+
+			resp, err := client.Do(request)
+			if err != nil {
+				fmt.Printf("Error executing request: %v\n", err)
+				errorCount.Add(1)
+				return
+			}
+			resp.Body.Close()
+
+			count.Add(1)
+		}()
+		// Добавляем небольшую задержку, чтобы предотвратить чрезмерное создание горутин
+		time.Sleep(750 * time.Nanosecond)
+	}
+
+	wg.Wait() // Дожидаемся окончания всех горутин
+
+	// Расчет среднего количества запросов в секунду
+	elapsed := time.Since(startTime).Seconds()
+	averagePerSecond := float64(count.Load()) / elapsed
+	return count.Load(), averagePerSecond, elapsed, errorCount.Load()
+}
+
+func TestAPIHandle() func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		count, averagePerSecond, elapsed, errors := TestAPIPerformance()
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(fmt.Sprintf("Удачных запросов: %d, Ошибок %d/%d (%.2f proc), Прошло времени: %f, Запросов в секунду в среднем: %.2f", count, errors, count+errors, float64(errors)/(float64(count+errors)/100), elapsed, averagePerSecond)))
+	}
 }

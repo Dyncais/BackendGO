@@ -9,6 +9,7 @@ type BannerInfo struct {
 		Text  string `json:"text"`
 		URL   string `json:"url"`
 	} `json:"content"`
+	IsActive bool `json:"is_active"`
 }
 
 type BannerBase struct {

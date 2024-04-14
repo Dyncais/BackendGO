@@ -46,7 +46,7 @@ func CreateDatabase(cfg *Config) error {
 	}
 	defer conn.Close(context.Background())
 
-	createDBQuery := fmt.Sprintf("CREATE IF NOT EXIST DATABASE \"%s\"", cfg.DBName)
+	createDBQuery := fmt.Sprintf("CREATE DATABASE \"%s\"", cfg.DBName)
 	if _, err := conn.Exec(context.Background(), createDBQuery); err != nil {
 		if strings.Contains(err.Error(), "already exists") {
 			return nil
@@ -74,16 +74,22 @@ func LoadBannerByParams(dbPool *pgxpool.Pool, tagID, featureID string, useLastRe
 	var banner models.BannerInfo
 
 	query := `
-        SELECT b.title, b.text, b.url
+        SELECT b.title, b.text, b.url, b.IsActive
         FROM banners b
         WHERE $1 = ANY(b.TagIDs) AND b.FeatureID = $2
         ORDER BY b.id DESC
         LIMIT 1;
     `
-	err := dbPool.QueryRow(context.Background(), query, tagID, featureID).Scan(&banner.Content.Title, &banner.Content.Text, &banner.Content.URL)
+	err := dbPool.QueryRow(context.Background(), query, tagID, featureID).Scan(&banner.Content.Title, &banner.Content.Text, &banner.Content.URL, &banner.IsActive)
+
 	if err != nil {
 		return nil, err
 	}
+
+	if !banner.IsActive {
+		return &banner, fmt.Errorf("BannerOff")
+	}
+
 	return &banner, nil
 }
 
