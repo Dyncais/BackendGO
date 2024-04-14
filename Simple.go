@@ -5,10 +5,12 @@ import (
 	"SomeProject/internal/cache"
 	"SomeProject/internal/db"
 	"SomeProject/internal/handlers"
+	"fmt"
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
 	"testing"
+	"time"
 )
 
 func main() {
@@ -19,7 +21,17 @@ func main() {
 		log.Printf("Не удалось создать БД %v", err)
 	}
 
-	dbPool, err := db.ConnectDB(cfg)
+	var dbPool *db.DBPool
+	var err error
+	for i := 0; i < 15; i++ {
+		dbPool, err = db.ConnectDB(cfg)
+		if err == nil {
+			fmt.Println("Успешно подключено к базе данных")
+			break
+		}
+		fmt.Printf("Попытка %d: Не удалось подключиться к базе данных, ошибка: %v\n", i+1, err)
+		time.Sleep(100 * time.Millisecond) // Ожидание 100 мс перед следующей попыткой
+	}
 	if err != nil {
 		log.Fatalf("Не удалось подключиться к базе данных: %v", err)
 	}
