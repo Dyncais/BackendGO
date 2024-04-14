@@ -5,7 +5,6 @@ import (
 	"SomeProject/internal/models"
 	"encoding/json"
 	"github.com/gorilla/mux"
-	"log"
 	"net/http"
 	"strconv"
 )
@@ -68,8 +67,6 @@ func DeleteBanner(dbPool *db.DBPool) func(w http.ResponseWriter, r *http.Request
 			http.Error(w, models.ErrNoAccess, http.StatusForbidden)
 			return
 		}
-
-		log.Println("DeleteBanner called")
 		vars := mux.Vars(r)
 		idStr := vars["id"]
 

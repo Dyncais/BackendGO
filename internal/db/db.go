@@ -46,8 +46,11 @@ func CreateDatabase(cfg *Config) error {
 	}
 	defer conn.Close(context.Background())
 
-	createDBQuery := fmt.Sprintf("CREATE DATABASE \"%s\"", cfg.DBName)
+	createDBQuery := fmt.Sprintf("CREATE IF NOT EXIST DATABASE \"%s\"", cfg.DBName)
 	if _, err := conn.Exec(context.Background(), createDBQuery); err != nil {
+		if strings.Contains(err.Error(), "already exists") {
+			return nil
+		}
 		return fmt.Errorf("failed to create database \"%s\": %v", cfg.DBName, err)
 	}
 
@@ -66,9 +69,9 @@ func ConnectDB(cfg *Config) (*DBPool, error) {
 	return &DBPool{Pool: dbPool}, nil
 }
 
-func LoadBannerByParams(dbPool *pgxpool.Pool, tagID, featureID string, useLastRevision bool) (*models.Banner, error) {
-	log.Println("LoadBannerByParams called")
-	var banner models.Banner
+func LoadBannerByParams(dbPool *pgxpool.Pool, tagID, featureID string, useLastRevision bool) (*models.BannerInfo, error) {
+
+	var banner models.BannerInfo
 
 	query := `
         SELECT b.title, b.text, b.url

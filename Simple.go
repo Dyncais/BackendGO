@@ -8,6 +8,7 @@ import (
 	"github.com/gorilla/mux"
 	"log"
 	"net/http"
+	"testing"
 )
 
 func main() {
@@ -15,7 +16,7 @@ func main() {
 	cfg := db.NewConfig()
 
 	if err := db.CreateDatabase(cfg); err != nil {
-		log.Printf("Warning: Unable to create database: %v", err)
+		log.Printf("Не удалось создать БД %v", err)
 	}
 
 	dbPool, err := db.ConnectDB(cfg)
@@ -24,16 +25,10 @@ func main() {
 	}
 	defer dbPool.Pool.Close()
 
-	if err := Test.DropTables(dbPool.Pool); err != nil {
-		log.Fatalf("Failed to drop tables: %v", err)
-	}
+	const enableTesting = false
 
-	if err := Test.CreateTables(dbPool.Pool); err != nil {
-		log.Fatalf("Failed to create tables: %v", err)
-	}
-
-	if err := Test.InsertTestData(dbPool.Pool); err != nil {
-		log.Fatalf("Failed to insert test data: %v", err)
+	if enableTesting {
+		StartTesting(dbPool)
 	}
 
 	bannerCache := cache.NewBannerCache()
@@ -51,5 +46,46 @@ func main() {
 	log.Println("Сервер запущен на порту 8080")
 	if err := http.ListenAndServe(":8080", router); err != nil {
 		log.Fatalf("Ошибка при запуске сервера: %v", err)
+	}
+}
+
+func StartTesting(dbPool *db.DBPool) {
+	if err := Test.DropTables(dbPool.Pool); err != nil {
+		log.Fatalf("Не удалось дропнуть: %v", err)
+	}
+
+	testing.Init()
+	t := new(testing.T)
+	Test.TestGetUserBanner(t)
+	if t.Failed() {
+		log.Println("Тесты на GET /user_banner не пройдены.")
+	} else {
+		log.Println("Все тесты GET /user_banner успешно пройдены.")
+	}
+	Test.TestGetBanners(t)
+	if t.Failed() {
+		log.Println("Тесты на GET /banner не пройдены.")
+	} else {
+		log.Println("Все тесты GET /banner успешно пройдены.")
+	}
+	Test.TestCreateBanner(t)
+	if t.Failed() {
+		log.Println("Тесты на POST /banner не пройдены.")
+	} else {
+		log.Println("Все тесты POST /banner успешно пройдены.")
+	}
+
+	Test.TestPatchBanner(t)
+	if t.Failed() {
+		log.Println("Тесты на PATCH /banner/{id} не пройдены.")
+	} else {
+		log.Println("Все тесты PATCH /banner/{id} успешно пройдены.")
+	}
+
+	Test.TestDeleteBanner(t)
+	if t.Failed() {
+		log.Println("Тесты на DELETE /banner/{id} не пройдены.")
+	} else {
+		log.Println("Все тесты DELETE /banner/{id} успешно пройдены.")
 	}
 }

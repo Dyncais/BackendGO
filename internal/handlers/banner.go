@@ -4,27 +4,26 @@ import (
 	"SomeProject/internal/db"
 	"SomeProject/internal/models"
 	"encoding/json"
-	"log"
 	"net/http"
 )
 
 func GetBanner(dbPool *db.DBPool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Println("GetBanner called")
 
-		tagID, featureID := r.URL.Query().Get("tag_id"), r.URL.Query().Get("feature_id")
-		limit, offset := r.URL.Query().Get("limit"), r.URL.Query().Get("offset")
 		token := r.Header.Get("token")
-
 		if token == "" {
 			http.Error(w, models.ErrUnauthorized, http.StatusUnauthorized)
 			return
 		}
-
 		if token != "admin_token" {
 			http.Error(w, models.ErrNoAccess, http.StatusForbidden)
 			return
 		}
+
+		tagID := r.URL.Query().Get("tag_id")
+		featureID := r.URL.Query().Get("feature_id")
+		limit := r.URL.Query().Get("limit")
+		offset := r.URL.Query().Get("offset")
 
 		if limit == "" {
 			limit = "10"
@@ -33,15 +32,13 @@ func GetBanner(dbPool *db.DBPool) http.HandlerFunc {
 			offset = "0"
 		}
 
-		banner, err := db.LoadBannersByParams(dbPool.Pool, tagID, featureID, limit, offset)
+		banners, err := db.LoadBannersByParams(dbPool.Pool, tagID, featureID, limit, offset)
 		if err != nil {
 			http.Error(w, models.ErrInternalServerError, http.StatusInternalServerError)
 			return
 		}
 
-		//bannerCache.Set(cacheKey, banner)
-
-		respondWithJSON(w, banner)
+		respondWithJSON(w, banners)
 	}
 }
 

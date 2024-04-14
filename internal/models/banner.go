@@ -3,6 +3,14 @@ package models
 
 import "time"
 
+type BannerInfo struct {
+	Content struct {
+		Title string `json:"title"`
+		Text  string `json:"text"`
+		URL   string `json:"url"`
+	} `json:"content"`
+}
+
 type BannerBase struct {
 	TagIDs    []int `json:"tag_ids"`
 	FeatureID int   `json:"feature_id"`
